@@ -1256,6 +1256,11 @@ bool OpTeller::Tell(const framework::ir::Node* node,
           }
         }
       }
+      // only support one input
+      if (desc.Inputs().size() > 1)
+      {
+        return false;
+      }
     }
 
     if (op_type == "elementwise_add" || op_type == "elementwise_mul" ||

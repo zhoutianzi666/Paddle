@@ -1,4 +1,4 @@
-// Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+// Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,18 +12,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
-#include "paddle/fluid/framework/new_executor/new_executor_defs.h"
-
-namespace paddle {
-namespace framework {
-namespace interpreter {
-void RecordEvent(const Instruction& instruction, const platform::Place& place);
-
-void RecordEvent(const Instruction& instruction);
-
-void WaitEvent(const Instruction& instruction, const platform::Place& place);
-
-}  // namespace interpreter
-}  // namespace framework
-}  // namespace paddle
+#include "paddle/fluid/inference/analysis/pass_result_info.h"

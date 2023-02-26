@@ -134,6 +134,16 @@ inline void TransposePadding(const half *input,
   } else {
     LAUNCH_TRANSPOSE_KERNEL(half, 1, padding);
   }
+
+  // int real_output_size = batch * seq_len * head_num * head_size;
+  // half * tmp_data = new half[real_output_size];
+  // cudaMemcpy(tmp_data, output, real_output_size * sizeof(half), cudaMemcpyDeviceToHost );
+  // for (int i =0;i < real_output_size; i++)
+  // {
+  //   //printf("%f\n", (float)(tmp_data[i]));
+  //   tmp_data[i] = 0;
+  // }
+  // cudaMemcpy(output, tmp_data, real_output_size * sizeof(half), cudaMemcpyHostToDevice);
 }
 
 inline void TransposeUnPadding(const half *input,
@@ -145,6 +155,13 @@ inline void TransposeUnPadding(const half *input,
                                const int real_seq_len,
                                cudaStream_t stream) {
   const dim3 grid(real_seq_len, batch);
+  int output_size = batch * seq_len * head_num * head_size;
+  
+  //PADDLE_ENFORCE_GPU_SUCCESS(cudaMemsetAsync(output, 0, sizeof(half) * output_size, stream));
+
+  //return;
+  auto input_ptr = reinterpret_cast<std::uintptr_t>(input);
+  auto output_ptr = reinterpret_cast<std::uintptr_t>(output);
   if (head_size % 8 == 0) {
     LAUNCH_TRANSPOSE_KERNEL(int4, 8, unpadding);
   } else if (head_size % 2 == 0) {
@@ -251,7 +268,7 @@ bool QkvToContextPluginDynamic::supportsFormatCombination(
   if (pos == 0) {
     if (with_fp16_) {
 #ifdef TRT_PLUGIN_FP16_AVALIABLE
-      return (in.type == nvinfer1::DataType::kFLOAT ||
+      return (in.type == nvinfer1::DataType::kHALF ||
               in.type == nvinfer1::DataType::kHALF) &&
              (in.format == nvinfer1::TensorFormat::kLINEAR);
 #else
@@ -428,6 +445,9 @@ int QkvToContextPluginDynamic::enqueue(
       multihead_temp_tensor.Resize({scratch_size + input_num});
       need_padding = (real_seq_len != seq_len) ? true : false;
     }
+
+    //need_padding = false;
+
     auto *multihead_temp_data =
         multihead_temp_tensor.mutable_data<int16_t>(  // NOLINT
             platform::CUDAPlace(device_id));
@@ -493,6 +513,17 @@ int QkvToContextPluginDynamic::enqueue(
       TransposeQKV(
           batch, seq_len, head_size_, head_number_, input0_data, tptr, stream);
     }
+
+  // int real_output_size = 3 * batch * seq_len * head_number_ * head_size_;
+  // half * tmp_data = new half[real_output_size];
+  // cudaMemcpy(tmp_data, tptr, real_output_size * sizeof(half), cudaMemcpyDeviceToHost );
+
+  // FILE*	   file = fopen("/zhoukangkang/Paddle_2_3/PaddleTest/inference/python_api_test/test_class_model/out_nan.txt", "w");
+  // for (int i =0;i < real_output_size; i++) {
+  //  // printf("输入 tptr： %f\n", (float)(tmp_data[i]));
+  //   //fprintf(file, "%f\n", (float)(tmp_data[i]));
+  // }
+  // fclose(file);
 
     auto *device_ctx = static_cast<phi::GPUContext *>(
         platform::DeviceContextPool::Instance().Get(

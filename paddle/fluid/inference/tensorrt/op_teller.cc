@@ -1320,7 +1320,16 @@ struct SimpleOpTypeSetTeller : public Teller {
         }
       }
     }
-
+    if (op_type == "bitwise_and") {
+        auto x_var_name = desc.Input("X")[0];
+        auto* block = desc.Block();
+        auto* x_var_desc = block->FindVar(x_var_name);
+        auto dtype = x_var_desc->GetDataType();
+        if (dtype != framework::proto::VarType::BOOL) {
+          VLOG(3) << "the bitwise_and TRT only support input of BOOL";
+          return false;
+        }
+      }
     if (op_type == "fill_constant_batch_size_like") {
       if (!with_dynamic_shape) {
         return false;
@@ -2949,6 +2958,7 @@ if (dtype ==  framework::proto::VarType::BOOL)
       "logical_or",
       "logical_xor",
       "logical_and",
+      "bitwise_and",
       "less_equal",
       "greater_equal",
       "dropout",
@@ -3122,6 +3132,7 @@ if (dtype ==  framework::proto::VarType::BOOL)
       "logical_or",
       "logical_xor",
       "logical_and",
+      "bitwise_and",
       "less_equal",
       "greater_equal",
       "dropout",

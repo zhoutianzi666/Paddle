@@ -612,11 +612,11 @@ class TensorRTEngineOp : public framework::OperatorBase {
       } else {
 #if IS_TRT_VERSION_GE(6000)
 
-//std::cout << "888888888" << std::endl;
-//std::cout <<t_shape.size() << std::endl;
+        // std::cout << "888888888" << std::endl;
+        // std::cout <<t_shape.size() << std::endl;
         trt_context->setBindingDimensions(
             bind_index, inference::tensorrt::Vec2TRT_Dims(t_shape, x, true));
-//std::cout << "99999" << std::endl;
+        // std::cout << "99999" << std::endl;
 
         // If this x is a shape tensor, we need call setInputShapeBinding
         if (engine->engine()->isShapeBinding(bind_index) &&
@@ -846,6 +846,7 @@ class TensorRTEngineOp : public framework::OperatorBase {
       params.disable_trt_plugin_fp16 = Attr<bool>("disable_trt_plugin_fp16");
       params.enable_low_precision_io = Attr<bool>("enable_low_precision_io");
       params.use_inspector = Attr<bool>("use_inspector");
+      params.engine_info_path = Attr<std::string>("engine_info_path");
 
       if (!shape_range_info_path_.empty()) {
         inference::DeserializeShapeRangeInfo(shape_range_info_path_,

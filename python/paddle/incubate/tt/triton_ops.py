@@ -17,7 +17,6 @@ import triton.language as tl
 
 import paddle
 from paddle import _C_ops
-import paddle.base.core as core
 from paddle.base.layer_helper import LayerHelper
 from paddle.framework import in_dynamic_or_pir_mode
 
@@ -461,15 +460,10 @@ def group_norm_first_stage(
     channel_mask = offset_channel[:,None] < group_size
     offset_block_mask = offset_block[None, :] <  (channel_stride - block_id * BLOCK_SIZE_M)
     sample_ = tl.load(sample_ptrs, mask = channel_mask & offset_block_mask, other=0.0)
-    # tl.static_print(" SAMPLE TYPE ", sample)
     sample = sample_.to(tl.float32)
-    # sample_fp32 = sample
     _sum = tl.sum(sample)
     
     _sum_squares = tl.sum(sample * sample)
-    # tl.static_print(_sum)
-    # tl.static_print(_sum_squares)
-    # # 直接add
     output_start = batch_id * group_num + group_id + tl.arange(0,1)
     tl.atomic_add(output_sum_ptr + output_start, _sum)
     tl.atomic_add(output_sum_squares_ptr + output_start, _sum_squares)
@@ -523,14 +517,12 @@ def group_norm_second_stage(
     if weight_ptr:
         weight_para_temp = tl.load(weight_ptr + group_id * group_size + offset_channel[:,None])
         weight_para = weight_para_temp.to(tl.float32)
-        # tl.static_print("weight_para", weight_para)
-        # tl.static_print("re_________", re_)
         re_ = re_ * weight_para
     if bias_ptr:
         bias_para_temp = tl.load(bias_ptr + group_id * group_size + offset_channel[:,None])
         bias_para = bias_para_temp.to(tl.float32)
         re_ = re_ + bias_para
-    # 这个得修改，以适应各种type
+
     re = re_.to(tl.float16)
     output_ptrs = output_ptr + data_start + offset_channel[:, None] * channel_stride + (offset_block[None,:] * hw_stride + block_id * BLOCK_SIZE_M) % (channel_stride)
     tl.store(output_ptrs, re)
@@ -640,6 +632,7 @@ def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, dat
 
 
     N,C,H,W = sample.shape
+    assert C % num_group == 0
     group_size = C // num_group
 
     BLOCK_SIZE_G = triton.next_power_of_2(group_size)
@@ -697,7 +690,7 @@ def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, dat
     address_hint1 += "*fp32:16" + ","
     address_hint1 += "*fp32:16" + ","
 
-    value_hint1 = get_value_hint(N) + ","
+    value_hint1 = "i32,"
     value_hint1 += get_value_hint(batch_stride) + ","
     value_hint1 += get_value_hint(channel_stride) + ","
     value_hint1 += get_value_hint(hw_stride) + ","
@@ -714,7 +707,7 @@ def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, dat
     address_hint2 += get_pointer_hint(sample) + ","
 
     value_hint2 = "fp32,"
-    value_hint2 += get_value_hint(N) + ","
+    value_hint2 += "i32,"
     value_hint2 += get_value_hint(batch_stride) + ","
     value_hint2 += get_value_hint(channel_stride) + ","
     value_hint2 += get_value_hint(hw_stride) + ","

@@ -464,7 +464,7 @@ def group_norm_first_stage(
     _sum = tl.sum(sample)
     
     _sum_squares = tl.sum(sample * sample)
-    output_start = batch_id * group_num + group_id + tl.arange(0,1)
+    output_start = batch_id * group_num + group_id
     tl.atomic_add(output_sum_ptr + output_start, _sum)
     tl.atomic_add(output_sum_squares_ptr + output_start, _sum_squares)
 
@@ -502,11 +502,10 @@ def group_norm_second_stage(
     sample = sample_.to(tl.float32)
     # 
     start = batch_id * group_num + group_id + tl.arange(0,1)
-    # 计算均值
+    # compute mean
     _sum = tl.load(output_sum_ptr + start)
-    # tl.device_print("sum",_sum)
     _mean = _sum / group_stride
-    # 计算方差
+    # compute var
     _sum_squares = tl.load(output_sum_squares_ptr + start)
     _var = _sum_squares / group_stride - _mean * _mean
     rstd = 1 / tl.sqrt(_var + eps)

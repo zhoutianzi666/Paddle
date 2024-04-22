@@ -156,18 +156,18 @@ setup(
 
 
 def get_value_hint(x):
-    if x % 16 == 0:
-        return "i32:16"
-    elif x % 8 == 0:
-        return "i32"
-    elif x % 4 == 0:
-        return "i32"
-    elif x % 2 == 0:
-        return "i32"
-    elif x == 1:
-        return "i32:1"
-    else:
-        return "i32"
+    hint = ""
+    for ele in x:
+        if type(ele) == int:
+            if ele % 16 == 0:
+                hint += "i32:16,"
+            elif ele == 1:
+                hint += "i32:1,"
+            else:
+                hint += "i32,"
+        if type(ele) == float:
+            hint += "fp32,"
+    return hint
 
 
 def build_package(generated_dir, python_package_name):
@@ -202,15 +202,18 @@ def rename_c_to_cu(generated_dir):
             os.rename(old_path, new_path)
 
 
-def get_pointer_hint(tensor):
-    if tensor.dtype == paddle.float16:
-        return "*fp16:16"
-    elif tensor.dtype == paddle.uint8:
-        return "*u8:16"
-    elif tensor.dtype == paddle.int8:
-        return "*i8:16"
-    elif tensor.dtype == paddle.float32:
-        return "*fp32:16"
+def get_pointer_hint(dtypes):
+    hint = ""
+    for ele in dtypes:
+        if ele == paddle.float16:
+            hint += "*fp16:16,"
+        elif ele == paddle.uint8:
+            hint += "*u8:16,"
+        elif ele == paddle.int8:
+            hint += "*i8:16,"
+        elif ele == paddle.float32:
+            hint += "*fp32:16,"
+    return hint
 
 
 paddle_custom_op_head_part = """ #include <vector>

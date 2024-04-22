@@ -239,7 +239,7 @@ CUdeviceptr get_tensor_ptr(const paddle::Tensor& input){
 
 tune_and_invoke_part = """
 if (!map_problem_${op_name}.count(problem_size)) {
-    std::cout << "we are tuning for ${op_name} which key is: ";
+    // std::cout << "we are tuning for ${op_name} which key is: ";
     for (int i = 0; i < problem_size.size(); i++) {
         std::cout << problem_size[i] << ", ";
     }
@@ -293,7 +293,7 @@ if (!map_problem_${op_name}.count(problem_size)) {
     }
 
     map_problem_${op_name}[problem_size] = select_id;
-    std::cout << "select algo id: " << select_id << std::endl;
+    // std::cout << "select algo id: " << select_id << std::endl;
     ${reset_zero_when_tune};
 }
 

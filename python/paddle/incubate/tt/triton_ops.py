@@ -550,7 +550,7 @@ int W = x.shape()[3];
 
 auto sum_out = paddle::full({N, group_num}, 0, paddle::DataType::FLOAT32, x.place());
 auto square_sum_out = paddle::full({N, group_num}, 0, paddle::DataType::FLOAT32, x.place());
-auto c_out = paddle::full({N, C, H, W}, 0, x.dtype(), x.place());
+auto c_out = paddle::empty({N, C, H, W}, x.dtype(), x.place());
 
 auto dev_x = get_tensor_ptr(x);
 auto dev_weight = get_tensor_ptr(weight);
@@ -736,9 +736,9 @@ def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, dat
     generated_dir = (
         f"/nishirong/Paddle/triton/aot/{op_name}"
     )
-    import shutil
-    if os.path.exists(generated_dir):
-        shutil.rmtree(generated_dir)
+    # import shutil
+    # if os.path.exists(generated_dir):
+    #     shutil.rmtree(generated_dir)
     
     os.makedirs(generated_dir, exist_ok=True)
 

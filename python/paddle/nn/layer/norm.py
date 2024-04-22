@@ -533,6 +533,10 @@ class GroupNorm(Layer):
             )
 
     def forward(self, input):
+        if len(input.shape) == 4:
+            from paddle.incubate.tt.triton_ops import group_norm as custom_group_norm
+            return custom_group_norm(input, self.weight, self.bias, self._epsilon, self._num_groups)
+        
         return group_norm(
             input,
             self._num_groups,

@@ -686,36 +686,18 @@ def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, dat
 
     op_name = "triton_group_norm_" + str(BLOCK_SIZE_G)
     
-    address_hint1 = get_pointer_hint(sample) + ","
-    address_hint1 += "*fp32:16" + ","
-    address_hint1 += "*fp32:16" + ","
-
+    #set default as *float16
+    dtypes1 = [sample.dtype, None, None]
+    address_hint1 = get_pointer_hint(dtypes1)
     value_hint1 = "i32,"
-    value_hint1 += get_value_hint(batch_stride) + ","
-    value_hint1 += get_value_hint(channel_stride) + ","
-    value_hint1 += get_value_hint(hw_stride) + ","
-    value_hint1 += get_value_hint(group_stride) + ","
-    value_hint1 += get_value_hint(num_group) + ","
-    value_hint1 += get_value_hint(group_size) + ","
+    x_list1 = [batch_stride, channel_stride, hw_stride, group_stride, num_group, group_size]
+    value_hint1 += get_value_hint(x_list1)
 
+    dtypes2 = [sample.dtype, sample.dtype, None, None, weight.dtype, bias.dtype]
+    address_hint2 = get_pointer_hint(dtypes2)
+    value_hint2 = "fp32," + value_hint1
 
-    address_hint2 = get_pointer_hint(sample) + ","
-    address_hint2 += get_pointer_hint(sample) + ","
-    address_hint2 += "*fp32:16" + ","
-    address_hint2 += "*fp32:16" + ","
-    address_hint2 += get_pointer_hint(sample) + ","
-    address_hint2 += get_pointer_hint(sample) + ","
-
-    value_hint2 = "fp32,"
-    value_hint2 += "i32,"
-    value_hint2 += get_value_hint(batch_stride) + ","
-    value_hint2 += get_value_hint(channel_stride) + ","
-    value_hint2 += get_value_hint(hw_stride) + ","
-    value_hint2 += get_value_hint(group_stride) + ","
-    value_hint2 += get_value_hint(num_group) + ","
-    value_hint2 += get_value_hint(group_size) + ","
-
-    op_name += (value_hint1.replace(",", "").replace(":", "") + value_hint2.replace(",", "").replace(":", ""))
+    op_name += (value_hint2.replace(",", "").replace(":", ""))
     
     first_kernel_name = op_name + "_first"
     second_kernel_name = op_name + "_second"

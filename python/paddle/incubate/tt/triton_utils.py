@@ -213,6 +213,8 @@ def get_pointer_hint(dtypes):
             hint += "*i8:16,"
         elif ele == paddle.float32:
             hint += "*fp32:16,"
+        else:
+            hint += "*fp32:16,"
     return hint
 
 

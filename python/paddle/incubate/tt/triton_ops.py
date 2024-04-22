@@ -433,6 +433,7 @@ def get_group_norm_kernel_config():
 @triton.autotune(
     configs=get_group_norm_kernel_config(),
     key=['batch_stride', 'channel_stride', 'hw_stride', 'group_stride', 'group_num'],
+    reset_to_zero=['output_sum_ptr', 'output_sum_squares_ptr'],
 )
 @triton.jit
 def group_norm_first_stage(
@@ -747,6 +748,10 @@ def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, dat
     extract_triton_kernel(group_norm_second_stage, py_script_file)
 
     op_dict = {"op_name": op_name, "reset_zero_when_tune": " ", "first_kernel_name": first_kernel_name, "second_kernel_name": second_kernel_name}
+    op_dict[
+        "reset_zero_when_tune"
+    ] = "cudaMemset((void*)dev_sum_out, 0, sizeof(float) * N * group_num); cudaMemset((void*)dev_square_sum_out, 0, sizeof(float) * N * group_num);"
+    
     paddle_custom_op_file_path = f"{generated_dir}/{op_name}.cu"
     so_path = find_so_path(generated_dir, python_package_name)
 

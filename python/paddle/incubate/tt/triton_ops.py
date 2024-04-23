@@ -638,9 +638,6 @@ def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, dat
     BLOCK_SIZE_G = triton.next_power_of_2(group_size)
     batch_stride, channel_stride, group_stride, hw_stride = C * H * W, H * W, group_size * H * W, 1
 
-    print("==================")
-    print(channel_stride)
-    print("==================")
     # if in_dynamic_or_pir_mode():
     #     output_sum = paddle.zeros((N, num_group), dtype=paddle.float32)
     #     output_sum_squares = paddle.zeros((N, num_group), dtype=paddle.float32)
@@ -719,9 +716,6 @@ def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, dat
     generated_dir = (
         f"/nishirong/Paddle/triton/aot/{op_name}"
     )
-    # import shutil
-    # if os.path.exists(generated_dir):
-    #     shutil.rmtree(generated_dir)
     
     os.makedirs(generated_dir, exist_ok=True)
 

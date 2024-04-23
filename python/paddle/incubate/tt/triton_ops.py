@@ -464,7 +464,7 @@ def group_norm_first_stage(
     _sum = tl.sum(sample)
     
     _sum_squares = tl.sum(sample * sample)
-    output_start = batch_id * group_num + group_id
+    output_start = batch_id * group_num + group_id + tl.arange(0,1)
     tl.atomic_add(output_sum_ptr + output_start, _sum)
     tl.atomic_add(output_sum_squares_ptr + output_start, _sum_squares)
 
@@ -502,10 +502,11 @@ def group_norm_second_stage(
     sample = sample_.to(tl.float32)
     # 
     start = batch_id * group_num + group_id + tl.arange(0,1)
-    # compute mean
+    # 计算均值
     _sum = tl.load(output_sum_ptr + start)
+    # tl.device_print("sum",_sum)
     _mean = _sum / group_stride
-    # compute var
+    # 计算方差
     _sum_squares = tl.load(output_sum_squares_ptr + start)
     _var = _sum_squares / group_stride - _mean * _mean
     rstd = 1 / tl.sqrt(_var + eps)
@@ -637,7 +638,9 @@ def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, dat
     BLOCK_SIZE_G = triton.next_power_of_2(group_size)
     batch_stride, channel_stride, group_stride, hw_stride = C * H * W, H * W, group_size * H * W, 1
 
-    
+    print("==================")
+    print(channel_stride)
+    print("==================")
     # if in_dynamic_or_pir_mode():
     #     output_sum = paddle.zeros((N, num_group), dtype=paddle.float32)
     #     output_sum_squares = paddle.zeros((N, num_group), dtype=paddle.float32)
@@ -688,9 +691,8 @@ def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, dat
     #set default as *float16
     dtypes1 = [sample.dtype, None, None]
     address_hint1 = get_pointer_hint(dtypes1)
-    value_hint1 = "i32,"
-    x_list1 = [batch_stride, channel_stride, hw_stride, group_stride, num_group, group_size]
-    value_hint1 += get_value_hint(x_list1)
+    x_list1 = [N, batch_stride, channel_stride, hw_stride, group_stride, num_group, group_size]
+    value_hint1 = get_value_hint(x_list1)
 
     dtypes2 = [sample.dtype, sample.dtype, None, None, weight.dtype, bias.dtype]
     address_hint2 = get_pointer_hint(dtypes2)
@@ -750,7 +752,7 @@ def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, dat
             f"""{python_path}   {compile_file} {py_script_file}   -n group_norm_first_stage   -o {generated_dir}/{first_kernel_name}_kernel --out-name {first_kernel_name}_kernel """
             + """ -w {num_warps}   -ns {num_stages}  \
         -s   "{address_hint} {value_hint}  {block_m}, {block_g}"   \
-        -g   " N , group_num,  channel_stride/{block_m}" \
+        -g   " {N} , {group_num},  ({channel_stride} + {block_m} - 1)/{block_m}" \
         """
         )
 
@@ -758,7 +760,7 @@ def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, dat
             f"""{python_path}   {compile_file} {py_script_file}   -n group_norm_second_stage   -o {generated_dir}/{second_kernel_name}_kernel --out-name {second_kernel_name}_kernel """
             + """ -w {num_warps}   -ns {num_stages}  \
         -s   "{address_hint} {value_hint}  {block_m}, {block_g}"   \
-        -g   " N , group_num,  channel_stride/{block_m}" \
+        -g   " {N} , {group_num},  ({channel_stride} + {block_m} - 1)/{block_m}" \
         """
         )
 
@@ -775,7 +777,10 @@ def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, dat
                 num_warps=num_warps,
                 num_stages=num_stages,
                 block_m=block_m,
-                block_g=BLOCK_SIZE_G
+                block_g=BLOCK_SIZE_G,
+                N = 1 if N==1 else 'N',
+                group_num = 1 if num_group==1 else 'group_num',
+                channel_stride = 1 if channel_stride==1 else 'channel_stride'
             )
             codegen_commands.append(codegen_command)
             print("codegen_command0", codegen_command)
@@ -787,7 +792,10 @@ def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, dat
                 num_warps=num_warps,
                 num_stages=num_stages,
                 block_m=block_m,
-                block_g=BLOCK_SIZE_G
+                block_g=BLOCK_SIZE_G,
+                N = 1 if N==1 else 'N',
+                group_num = 1 if num_group==1 else 'group_num',
+                channel_stride = 1 if channel_stride==1 else 'channel_stride'
             )
             print("codegen_command1", codegen_command)
             codegen_commands.append(codegen_command)
@@ -820,9 +828,9 @@ def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, dat
         return outs[0]
 
     helper = LayerHelper(op_name, **locals())
-    out = helper.create_variable_for_type_inference(dtype=x.dtype)
+    out = helper.create_variable_for_type_inference(dtype=sample.dtype)
     inputs = {
-        'x': x,
+        'x': sample,
         'weight': weight,
         'bias': bias,
     }

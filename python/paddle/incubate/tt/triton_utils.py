@@ -214,7 +214,7 @@ def get_pointer_hint(dtypes):
         elif ele == paddle.float32:
             hint += "*fp32:16,"
         else:
-            hint += "*fp32:16,"
+            assert False, "Not supported data type."
     return hint
 
 
@@ -244,7 +244,7 @@ CUdeviceptr get_tensor_ptr(const paddle::Tensor& input){
 
 tune_and_invoke_part = """
 if (!map_problem_${op_name}.count(problem_size)) {
-    // std::cout << "we are tuning for ${op_name} which key is: ";
+    std::cout << "we are tuning for ${op_name} which key is: ";
     for (int i = 0; i < problem_size.size(); i++) {
         std::cout << problem_size[i] << ", ";
     }

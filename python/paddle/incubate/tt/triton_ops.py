@@ -636,6 +636,7 @@ def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, dat
 
     N,C,H,W = sample.shape
     assert C % num_group == 0
+    assert H > 0 and W > 0, "when d2s, H and W must be greater than 0"
     group_size = C // num_group
 
     BLOCK_SIZE_G = triton.next_power_of_2(group_size)
@@ -687,14 +688,13 @@ def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, dat
     import sys
 
     op_name = "triton_group_norm_" + str(BLOCK_SIZE_G)
-    
-    #set default as *float16
-    dtypes1 = [sample.dtype, None, None]
+
+    dtypes1 = [sample.dtype, paddle.float32, paddle.float32]
     address_hint1 = get_pointer_hint(dtypes1)
     x_list1 = [N, batch_stride, channel_stride, hw_stride, group_stride, num_group, group_size]
     value_hint1 = get_value_hint(x_list1)
 
-    dtypes2 = [sample.dtype, sample.dtype, None, None, weight.dtype, bias.dtype]
+    dtypes2 = [sample.dtype, sample.dtype, paddle.float32, paddle.float32, weight.dtype, bias.dtype]
     address_hint2 = get_pointer_hint(dtypes2)
     value_hint2 = "fp32," + value_hint1
 
@@ -711,11 +711,10 @@ def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, dat
         op_name in OpProtoHolder.instance().op_proto_map.keys()
         and in_dynamic_or_pir_mode()
     ):
-        # print("op_name: ", op_name, " is already registered in paddle.base")
         outs = _C_ops._run_custom_op(
             op_name, sample, weight, bias, num_group, eps)
         return outs[0]
-
+    
     generated_dir = (
         f"/nishirong/Paddle/triton/aot/{op_name}"
     )
@@ -780,8 +779,6 @@ def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, dat
                 channel_stride = 1 if channel_stride==1 else 'channel_stride'
             )
             codegen_commands.append(codegen_command)
-            print("codegen_command0", codegen_command)
-
 
             codegen_command = aot_template2.format(
                 address_hint=address_hint2,
@@ -794,7 +791,6 @@ def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, dat
                 group_num = 1 if num_group==1 else 'group_num',
                 channel_stride = 1 if channel_stride==1 else 'channel_stride'
             )
-            print("codegen_command1", codegen_command)
             codegen_commands.append(codegen_command)
 
 

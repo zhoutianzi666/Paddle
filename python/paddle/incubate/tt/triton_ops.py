@@ -459,7 +459,6 @@ def group_norm_first_stage(
     offset_block = tl.arange(0, BLOCK_SIZE_M)
     data_start = batch_id * batch_stride + group_id * group_stride
     sample_ptrs = sample_ptr + data_start + offset_channel[:, None] * channel_stride + offset_block[None, :] * hw_stride + block_id * BLOCK_SIZE_M
-    # 计算均值
     channel_mask = offset_channel[:,None] < group_size
     offset_block_mask = offset_block[None, :] <  (channel_stride - block_id * BLOCK_SIZE_M)
     sample_ = tl.load(sample_ptrs, mask = channel_mask & offset_block_mask, other=0.0)
@@ -467,7 +466,7 @@ def group_norm_first_stage(
     _sum = tl.sum(sample)
     
     _sum_squares = tl.sum(sample * sample)
-    output_start = batch_id * group_num + group_id + tl.arange(0,1)
+    output_start = batch_id * group_num + group_id
     tl.atomic_add(output_sum_ptr + output_start, _sum)
     tl.atomic_add(output_sum_squares_ptr + output_start, _sum_squares)
 
@@ -504,27 +503,26 @@ def group_norm_second_stage(
     sample_ = tl.load(sample_ptrs)
     sample = sample_.to(tl.float32)
     # 
-    start = batch_id * group_num + group_id + tl.arange(0,1)
-    # 计算均值
+    start = batch_id * group_num + group_id
+    # compute mean
     _sum = tl.load(output_sum_ptr + start)
-    # tl.device_print("sum",_sum)
     _mean = _sum / group_stride
-    # 计算方差
+    # compute var
     _sum_squares = tl.load(output_sum_squares_ptr + start)
     _var = _sum_squares / group_stride - _mean * _mean
     rstd = 1 / tl.sqrt(_var + eps)
-    re_ = (sample - _mean) * rstd
+    re_ = (sample - _mean) * rstd 
 
     weight_para = tl.zeros((BLOCK_SIZE_G, 1), dtype= tl.float32)
     bias_para = tl.zeros((BLOCK_SIZE_G, 1), dtype= tl.float32)
-    if weight_ptr:
-        weight_para_temp = tl.load(weight_ptr + group_id * group_size + offset_channel[:,None])
-        weight_para = weight_para_temp.to(tl.float32)
-        re_ = re_ * weight_para
-    if bias_ptr:
-        bias_para_temp = tl.load(bias_ptr + group_id * group_size + offset_channel[:,None])
-        bias_para = bias_para_temp.to(tl.float32)
-        re_ = re_ + bias_para
+
+    weight_para_temp = tl.load(weight_ptr + group_id * group_size + offset_channel[:,None])
+    weight_para = weight_para_temp.to(tl.float32)
+    re_ = re_ * weight_para
+    
+    bias_para_temp = tl.load(bias_ptr + group_id * group_size + offset_channel[:,None])
+    bias_para = bias_para_temp.to(tl.float32)
+    re_ = re_ + bias_para
 
     re = re_.to(tl.float16)
     output_ptrs = output_ptr + data_start + offset_channel[:, None] * channel_stride + (offset_block[None,:] * hw_stride + block_id * BLOCK_SIZE_M) % (channel_stride)
@@ -628,15 +626,17 @@ PD_BUILD_OP(${op_name})
 """
 )
 
-# weight 和 bias 设成必选
 
 
-def group_norm(sample, weight = None , bias = None, eps=1e-5, num_group = 1, data_format="NCHW"):
+def group_norm(sample, weight , bias, eps=1e-5, num_group = 1, data_format="NCHW"):
 
 
     N,C,H,W = sample.shape
     assert C % num_group == 0
     assert H > 0 and W > 0, "when d2s, H and W must be greater than 0"
+    assert (
+        sample.dtype == paddle.float16
+    ), "group_norm now only support float16 as input sample type"
     group_size = C // num_group
 
     BLOCK_SIZE_G = triton.next_power_of_2(group_size)

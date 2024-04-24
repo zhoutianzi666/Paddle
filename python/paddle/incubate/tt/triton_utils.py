@@ -298,7 +298,7 @@ if (!map_problem_${op_name}.count(problem_size)) {
     }
 
     map_problem_${op_name}[problem_size] = select_id;
-    // std::cout << "select algo id: " << select_id << std::endl;
+    std::cout << "select algo id: " << select_id << std::endl;
     ${reset_zero_when_tune};
 }
 

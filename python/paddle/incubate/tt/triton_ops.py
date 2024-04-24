@@ -511,17 +511,14 @@ def group_norm_second_stage(
     _sum_squares = tl.load(output_sum_squares_ptr + start)
     _var = _sum_squares / group_stride - _mean * _mean
     rstd = 1 / tl.sqrt(_var + eps)
-    re_ = (sample - _mean) * rstd 
-
-    weight_para = tl.zeros((BLOCK_SIZE_G, 1), dtype= tl.float32)
-    bias_para = tl.zeros((BLOCK_SIZE_G, 1), dtype= tl.float32)
 
     weight_para_temp = tl.load(weight_ptr + group_id * group_size + offset_channel[:,None])
     weight_para = weight_para_temp.to(tl.float32)
-    re_ = re_ * weight_para
-    
     bias_para_temp = tl.load(bias_ptr + group_id * group_size + offset_channel[:,None])
     bias_para = bias_para_temp.to(tl.float32)
+    
+    re_ = (sample - _mean) * rstd 
+    re_ = re_ * weight_para
     re_ = re_ + bias_para
 
     re = re_.to(tl.float16)

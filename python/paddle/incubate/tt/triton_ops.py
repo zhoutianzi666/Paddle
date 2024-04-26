@@ -685,28 +685,11 @@ def group_norm(sample, weight , bias, eps=1e-5, num_group = 1, data_format="NCHW
         # )
         # return output
 
-    import os
-    import sys
-
     op_name = "triton_group_norm_" + str(BLOCK_SIZE_G)
+    # -1 means this value does not matter for triton compilation
+    x_list = [batch_stride, channel_stride, hw_stride, group_stride, num_group, group_size]
 
-    dtypes1 = [sample.dtype, paddle.float32, paddle.float32]
-    address_hint1 = get_pointer_hint(dtypes1)
-    x_list1 = [N, batch_stride, channel_stride, hw_stride, group_stride, num_group, group_size]
-    value_hint1 = get_value_hint(x_list1)
-
-    dtypes2 = [sample.dtype, sample.dtype, paddle.float32, paddle.float32, weight.dtype, bias.dtype]
-    address_hint2 = get_pointer_hint(dtypes2)
-    value_hint2 = "fp32," + value_hint1
-
-    op_name += (value_hint2.replace(",", "").replace(":", ""))
-    
-    first_kernel_name = op_name + "_first"
-    second_kernel_name = op_name + "_second"
-
-    python_package_name = f"{op_name}_package"
-
-    from paddle.base.framework import OpProtoHolder
+    op_name = get_op_name_with_suffix(op_name, x_list) + get_pointer_hint(sample.dtype)
 
     if (
         op_name in OpProtoHolder.instance().op_proto_map.keys()
@@ -716,6 +699,20 @@ def group_norm(sample, weight , bias, eps=1e-5, num_group = 1, data_format="NCHW
             op_name, sample, weight, bias, num_group, eps)
         return outs[0]
     
+    dtypes1 = [sample.dtype, paddle.float32, paddle.float32]
+    address_hint1 = get_pointer_hint(dtypes1)
+    x_list1 = [N, batch_stride, channel_stride, hw_stride, group_stride, num_group, group_size]
+    value_hint1 = get_value_hint(x_list1)
+
+    dtypes2 = [sample.dtype, sample.dtype, paddle.float32, paddle.float32, weight.dtype, bias.dtype]
+    address_hint2 = get_pointer_hint(dtypes2)
+    value_hint2 = "fp32," + value_hint1
+
+    first_kernel_name = op_name + "_first"
+    second_kernel_name = op_name + "_second"
+
+    python_package_name = f"{op_name}_package"
+
     generated_dir = (
         f"/nishirong/Paddle/triton/aot/{op_name}"
     )
@@ -810,7 +807,6 @@ def group_norm(sample, weight , bias, eps=1e-5, num_group = 1, data_format="NCHW
         # build the package to so, not install
         build_package(generated_dir, python_package_name)
     
-    from paddle.base.framework import OpProtoHolder
 
     if op_name not in OpProtoHolder.instance().op_proto_map.keys():
         so_path = find_so_path(generated_dir, python_package_name)

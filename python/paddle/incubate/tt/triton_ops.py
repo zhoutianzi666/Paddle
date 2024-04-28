@@ -689,7 +689,7 @@ def group_norm(sample, weight , bias, eps=1e-5, num_group = 1, data_format="NCHW
     # -1 means this value does not matter for triton compilation
     x_list = [batch_stride, channel_stride, hw_stride, group_stride, num_group, group_size]
 
-    op_name = get_op_name_with_suffix(op_name, x_list) + get_pointer_hint(sample.dtype)
+    op_name = get_op_name_with_suffix(op_name, x_list)
 
     if (
         op_name in OpProtoHolder.instance().op_proto_map.keys()

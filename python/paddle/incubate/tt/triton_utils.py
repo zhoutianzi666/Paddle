@@ -103,7 +103,7 @@ def extract_triton_kernel(kernel, file_name):
 
     py_script = py_script.replace("if bias_ptr is not None", "if bias_ptr")
 
-    with open(file_name, "w") as f:
+    with open(file_name, "a+") as f:
         f.write(py_script)
         f.close()
 
@@ -225,6 +225,8 @@ def get_pointer_hint(dtypes):
             hint += "*i8:16,"
         elif ele == paddle.float32:
             hint += "*fp32:16,"
+        else:
+            assert False, "Not supported data type."
     return hint
 
 
@@ -318,3 +320,37 @@ if (!map_problem_${op_name}.count(problem_size)) {
     assert(status == CUDA_SUCCESS);
   }
 """
+
+
+
+#####################################################
+
+paddle_custom_op_head_part_with_two_kernels = """ #include <vector>
+#include "${first_kernel_name}_kernel.h"
+#include "${second_kernel_name}_kernel.h"
+#include "paddle/extension.h"
+
+std::map<std::vector<int>, int> map_problem_${first_kernel_name};
+std::map<std::vector<int>, int> map_problem_${second_kernel_name};
+
+CUdeviceptr get_tensor_ptr(const paddle::Tensor& input){
+  if (input.type() == paddle::DataType::FLOAT16) {
+    return (CUdeviceptr)(input.data<phi::dtype::float16>());
+  } else if (input.type() == paddle::DataType::INT32) {
+    return (CUdeviceptr)(input.data<int>());
+  } else if (input.type() == paddle::DataType::FLOAT32) {
+    return (CUdeviceptr)(input.data<float>());
+  } else if (input.type() == paddle::DataType::UINT8) {
+    return (CUdeviceptr)(input.data<uint8_t>());
+  } else if (input.type() == paddle::DataType::INT8) {
+    return (CUdeviceptr)(input.data<int8_t>());
+  } else {
+    assert(false);
+    return (CUdeviceptr)(nullptr);
+  }
+} """
+
+tune_and_invoke_part_with_two_kernels = tune_and_invoke_part.replace("${op_name}", "${first_kernel_name}").replace("run_triton_kernel", "run_triton_first_kernel") + tune_and_invoke_part.replace("${op_name}", "${second_kernel_name}").replace("run_triton_kernel", "run_triton_second_kernel").replace("${reset_zero_when_tune}", "")
+
+
+

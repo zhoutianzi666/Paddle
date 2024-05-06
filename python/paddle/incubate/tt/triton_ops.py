@@ -635,9 +635,9 @@ def group_norm(sample, weight , bias, eps=1e-5, num_group = 1, data_format="NCHW
     N,C,H,W = sample.shape
     assert C % num_group == 0
     assert H > 0 and W > 0, "when d2s, H and W must be greater than 0"
-    assert (
-        sample.dtype == paddle.float16
-    ), "group_norm now only support float16 as input sample type"
+    # assert (
+    #     sample.dtype == paddle.float16 or sample.dtype == paddle.float32
+    # ), "group_norm now only support float16 as input sample type"
     group_size = C // num_group
 
     BLOCK_SIZE_G = triton.next_power_of_2(group_size)
